@@ -161,6 +161,17 @@ metadata:
           storage: file_storage
           queue_size: 10000
 
+      # NEW: OTLP exporter to send traces to Tempo.
+      otlp:
+        # IMPORTANT: Replace with your actual Tempo endpoint.
+        endpoint: "tempo.observability.svc.cluster.local:4317"
+        tls:
+          insecure: true # Set to false and configure TLS if Tempo requires it.
+        sending_queue:
+          enabled: true
+          storage: file_storage
+          queue_size: 10000
+
     extensions:
       file_storage:
         directory: /var/lib/otelcol/storage 
@@ -177,7 +188,8 @@ metadata:
         traces:
           receivers: [otlp]
           processors: [resource, memory_limiter, batch]
-          exporters: [logging] 
+          # UPDATED: Send traces to the new OTLP exporter (for Tempo) and logging.
+          exporters: [otlp, logging] 
 
         logs:
           receivers: [k8s_events]
