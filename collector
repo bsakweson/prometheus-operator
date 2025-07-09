@@ -1,0 +1,276 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-collector-k8s-metrics
+  namespace: observability
+  mode: daemonset
+  
+  volumeMounts:
+    - name: storage
+      mountPath: /var/lib/otelcol/storage
+  volumes:
+    - name: storage
+      hostPath:
+        path: /var/lib/otelcol-storage
+        type: DirectoryOrCreate
+
+  config: |
+    receivers:
+      # NEW: OTLP receiver for application metrics, traces, and logs.
+      otlp:
+        protocols:
+          grpc: # Default endpoint: 0.0.0.0:4317
+          http: # Default endpoint: 0.0.0.0:4318
+
+      # k8s_cluster receiver still generates cluster-level metrics from the API server.
+      k8s_cluster:
+        collection_interval: 10s
+        node_conditions_to_report: [Ready, MemoryPressure, DiskPressure, PIDPressure]
+        allocatable_types_to_report: [cpu, memory, pods]
+
+      # NEW: k8s_events receiver for collecting cluster events.
+      k8s_events:
+
+      prometheus:
+        config:
+          scrape_configs:
+            # UPDATED FOR OPENSHIFT: Scrapes the kubelet's secure port directly.
+            - job_name: 'openshift-kubelet'
+              kubernetes_sd_configs:
+                - role: node
+              scheme: https
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                # The collector's service account token is used to authenticate with the kubelet.
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              relabel_configs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(.+)
+                # Use the node name to build the scrape address for the kubelet's secure port.
+                - target_label: __address__
+                  replacement: ${__meta_kubernetes_node_name}:10250
+                # Set the correct metrics path for cAdvisor.
+                - source_labels: [__meta_kubernetes_node_name]
+                  regex: (.+)
+                  target_label: __metrics_path__
+                  replacement: /metrics/cadvisor
+
+            # NEW: Scrapes services that have the 'prometheus.io/scrape: true' annotation.
+            - job_name: 'kubernetes-services'
+              kubernetes_sd_configs:
+                - role: service
+              relabel_configs:
+                # Scrape only services that have the 'prometheus.io/scrape: true' annotation.
+                - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: true
+                # Use the 'prometheus.io/scheme' annotation to set the scrape scheme (http or https). Defaults to http.
+                - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+                  action: replace
+                  target_label: __scheme__
+                  regex: (https?)
+                # Use the 'prometheus.io/path' annotation to set the metrics path. Defaults to /metrics.
+                - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+                  action: replace
+                  target_label: __metrics_path__
+                  regex: (.+)
+                # Use the service name and namespace to construct the address.
+                - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+                  action: replace
+                  target_label: __address__
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                # Copy all service labels to the metric.
+                - action: labelmap
+                  regex: __meta_kubernetes_service_label_(.+)
+                # Copy namespace and service name as labels.
+                - source_labels: [__meta_kubernetes_namespace]
+                  action: replace
+                  target_label: kubernetes_namespace
+                - source_labels: [__meta_kubernetes_service_name]
+                  action: replace
+                  target_label: kubernetes_name
+
+            # UPDATED FOR OPENSHIFT: Scrapes OpenShift DNS pods for metrics.
+            - job_name: 'openshift-dns'
+              kubernetes_sd_configs:
+                - role: pod
+              scheme: https
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              relabel_configs:
+                # Only scrape pods in the 'openshift-dns' namespace.
+                - source_labels: [__meta_kubernetes_namespace]
+                  action: keep
+                  regex: openshift-dns
+                # Only scrape pods with the 'dns.operator.openshift.io/daemonset-dns: default' label.
+                - source_labels: [__meta_kubernetes_pod_label_dns_operator_openshift_io_daemonset_dns]
+                  action: keep
+                  regex: default
+                # Use the pod's IP and the secure metrics port (9154).
+                - source_labels: [__address__]
+                  action: replace
+                  target_label: __address__
+                  regex: ([^:]+)(?::\d+)?
+                  replacement: $1:9154
+                # Copy all pod labels to the metric.
+                - action: labelmap
+                  regex: __meta_kubernetes_pod_label_(.+)
+                # Copy namespace and pod name as labels.
+                - source_labels: [__meta_kubernetes_namespace]
+                  action: replace
+                  target_label: kubernetes_namespace
+                - source_labels: [__meta_kubernetes_pod_name]
+                  action: replace
+                  target_label: kubernetes_name
+
+    processors:
+      # Adds a static 'cluster' attribute to all metrics.
+      # IMPORTANT: Change 'your-cluster-name' to the actual name of the cluster where this is deployed.
+      resource:
+        attributes:
+          - key: cluster
+            value: "your-cluster-name" 
+            action: upsert
+      
+      # Batches data before sending to reduce network traffic.
+      batch:
+
+      # Prevents the collector from using excessive memory.
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+
+    exporters:
+      prometheusremotewrite:
+        endpoint: "http://prometheus-server.prometheus.svc.cluster.local/api/v1/write"
+        tls:
+          insecure: true
+       
+        sending_queue:
+          enabled: true
+          storage: file_storage
+          queue_size: 10000
+      
+      logging:
+        verbosity: detailed
+        sending_queue:
+          enabled: true
+          storage: file_storage
+          queue_size: 10000
+
+    extensions:
+      file_storage:
+        directory: /var/lib/otelcol/storage 
+        timeout: 1s
+
+    service:
+      extensions: [file_storage]
+      pipelines:
+        metrics:
+          receivers: [otlp, k8s_cluster, prometheus]
+          processors: [resource, memory_limiter, batch]
+          exporters: [prometheusremotewrite, logging]
+        
+        traces:
+          receivers: [otlp]
+          processors: [resource, memory_limiter, batch]
+          exporters: [logging] 
+
+        logs:
+          receivers: [k8s_events]
+          processors: [resource, memory_limiter, batch]
+          exporters: [logging]
+
+  # The collector needs these permissions to discover nodes and services.
+  serviceAccount: otel-collector-k8s-metrics-sa
+---
+# ServiceAccount for the OpenTelemetry Collector
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector-k8s-metrics-sa
+  namespace: observability
+---
+# ClusterRole with necessary permissions for node and service discovery
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector-k8s-metrics-role
+rules:
+- apiGroups: [""]
+  resources:
+  - "nodes"
+  - "nodes/proxy"
+  - "nodes/metrics"
+  - "services"
+  - "endpoints"
+  - "pods"
+  - "namespaces" # Added for k8s_cluster receiver
+  - "replicationcontrollers" # Added for k8s_cluster receiver
+  - "events" # Added for k8s_events receiver
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+  - "daemonsets"
+  - "deployments"
+  - "replicasets"
+  - "statefulsets"
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources:
+  - "jobs"
+  - "cronjobs"
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+# ClusterRoleBinding to grant the permissions to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector-k8s-metrics-rb
+subjects:
+- kind: ServiceAccount
+  name: otel-collector-k8s-metrics-sa
+  namespace: observability
+roleRef:
+  kind: ClusterRole
+  name: otel-collector-k8s-metrics-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# --- BEGIN OPENSHIFT-SPECIFIC CONFIGURATION ---
+#
+# The following resources grant the collector's ServiceAccount the necessary
+# permissions to run on OpenShift's security-hardened environment.
+
+# Grants the ability to use the 'privileged' Security Context Constraint (SCC).
+# This is required for the collector to access host-level resources like the kubelet.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector-scc-role
+rules:
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+  resourceNames:
+  - privileged
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector-scc-binding
+subjects:
+- kind: ServiceAccount
+  name: otel-collector-k8s-metrics-sa
+  namespace: observability
+roleRef:
+  kind: ClusterRole
+  name: otel-collector-scc-role
+  apiGroup: rbac.authorization.k8s.io
