@@ -1,0 +1,173 @@
+# AI-Powered Observability with Natural Language Dashboards
+
+### Atlanta, GA · December 10, 2025
+
+---
+
+## Slide 1: The Problem & Vision
+
+**"What if you could just ask your observability platform questions in plain English?"**
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4F46E5', 'primaryTextColor': '#1E293B', 'primaryBorderColor': '#3730A3', 'lineColor': '#1E293B', 'secondaryColor': '#F0FDF4', 'tertiaryColor': '#EEF2FF', 'background': '#ffffff', 'mainBkg': '#ffffff', 'nodeBorder': '#3730A3', 'clusterBkg': '#F8FAFC', 'clusterBorder': '#CBD5E1', 'titleColor': '#1E293B', 'edgeLabelBackground': '#ffffff'}}}%%
+flowchart LR
+    subgraph Today["Today's Reality"]
+        direction TB
+        Q1["Complex PromQL"]
+        Q2["Dashboard Sprawl"]
+        Q3["Tribal Knowledge"]
+    end
+
+    Transform["AI + Perses"]
+
+    subgraph Tomorrow["AI-Native Observability"]
+        direction TB
+        A1["Natural Language"]
+        A2["Auto-Generated Dashboards"]
+        A3["Contextual Insights"]
+    end
+
+    Today ==>|" "| Transform
+    Transform ==>|" "| Tomorrow
+
+    style Today fill:#FEE2E2,stroke:#B91C1C,stroke-width:3px,rx:15,ry:15
+    style Tomorrow fill:#D1FAE5,stroke:#047857,stroke-width:3px,rx:15,ry:15
+    style Transform fill:#4F46E5,stroke:#3730A3,stroke-width:3px,color:#ffffff,rx:12,ry:12
+    style Q1 fill:#FECACA,stroke:#DC2626,stroke-width:2px,color:#7F1D1D,rx:10,ry:10
+    style Q2 fill:#FECACA,stroke:#DC2626,stroke-width:2px,color:#7F1D1D,rx:10,ry:10
+    style Q3 fill:#FECACA,stroke:#DC2626,stroke-width:2px,color:#7F1D1D,rx:10,ry:10
+    style A1 fill:#A7F3D0,stroke:#059669,stroke-width:2px,color:#064E3B,rx:10,ry:10
+    style A2 fill:#A7F3D0,stroke:#059669,stroke-width:2px,color:#064E3B,rx:10,ry:10
+    style A3 fill:#A7F3D0,stroke:#059669,stroke-width:2px,color:#064E3B,rx:10,ry:10
+
+    linkStyle 0,1 stroke:#4F46E5,stroke-width:4px
+```
+
+### The Challenge
+
+- **PromQL is powerful but complex** — steep learning curve for developers
+- **Dashboard fatigue** — hundreds of dashboards, hard to find the right one  
+- **MTTR impact** — time spent writing queries = time not fixing issues
+
+---
+
+## Slide 2: Architecture — AI Meets Perses
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4F46E5', 'primaryTextColor': '#ffffff', 'lineColor': '#6366F1', 'background': '#ffffff', 'nodeBorder': '#CBD5E1', 'clusterBkg': '#F8FAFC', 'clusterBorder': '#E2E8F0'}}}%%
+flowchart TB
+    subgraph Input["Natural Language Input"]
+        User["Engineer"]
+        Query["'Show me error rates<br/>for checkout service'"]
+    end
+
+    subgraph AI["AI Layer"]
+        LLM["LLM Engine<br/>(GPT-4 / Claude / Llama)"]
+        Intent["Intent Recognition"]
+        Builder["Query Builder"]
+    end
+
+    subgraph Perses["Perses (CNCF)"]
+        API["Dashboard API"]
+        Panels["Panel Generator"]
+        Render["Visualization"]
+    end
+
+    subgraph Data["Observability Stack"]
+        Prom["Prometheus"]
+        Loki["Loki"]
+        Tempo["Tempo"]
+    end
+
+    User --> Query
+    Query --> LLM
+    LLM --> Intent
+    Intent --> Builder
+    Builder --> API
+    API --> Panels
+    Panels --> Render
+    Render --> Prom
+    Render --> Loki
+    Render --> Tempo
+
+    style User fill:#4F46E5,stroke:#3730A3,color:#fff,rx:25,ry:25
+    style Query fill:#E0E7FF,stroke:#6366F1,color:#1E293B,rx:12,ry:12
+    style LLM fill:#7C3AED,stroke:#5B21B6,color:#fff,rx:12,ry:12
+    style Intent fill:#A78BFA,stroke:#7C3AED,color:#fff,rx:12,ry:12
+    style Builder fill:#A78BFA,stroke:#7C3AED,color:#fff,rx:12,ry:12
+    style API fill:#F97316,stroke:#EA580C,color:#fff,rx:12,ry:12
+    style Panels fill:#FB923C,stroke:#F97316,color:#fff,rx:12,ry:12
+    style Render fill:#FDBA74,stroke:#FB923C,color:#1E293B,rx:12,ry:12
+    style Prom fill:#E6522C,stroke:#C2410C,color:#fff,rx:12,ry:12
+    style Loki fill:#F59E0B,stroke:#D97706,color:#fff,rx:12,ry:12
+    style Tempo fill:#06B6D4,stroke:#0891B2,color:#fff,rx:12,ry:12
+    style Input fill:#EEF2FF,stroke:#C7D2FE,rx:20,ry:20
+    style AI fill:#F5F3FF,stroke:#DDD6FE,rx:20,ry:20
+    style Perses fill:#FFF7ED,stroke:#FED7AA,rx:20,ry:20
+    style Data fill:#F0FDF4,stroke:#BBF7D0,rx:20,ry:20
+```
+
+### Why Perses?
+
+| Feature | Benefit |
+|---------|---------|
+| **CNCF Sandbox Project** | Vendor-neutral, community-driven |
+| **Dashboard-as-Code** | GitOps native, version controlled |
+| **Plugin Architecture** | Extensible panels & data sources |
+| **Multi-tenant** | Built for platform teams at scale |
+| **API-First Design** | Perfect for AI integration |
+
+---
+
+## Slide 3: Live Demo Flow
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1E3A5F', 'actorTextColor': '#ffffff', 'actorBkg': '#1E3A5F', 'actorBorder': '#0F2942', 'actorLineColor': '#1E3A5F', 'signalColor': '#1E293B', 'signalTextColor': '#1E293B', 'labelBoxBkgColor': '#FEF3C7', 'labelBoxBorderColor': '#F59E0B', 'labelTextColor': '#92400E', 'loopTextColor': '#1E3A5F', 'noteBkgColor': '#FEF3C7', 'noteBorderColor': '#F59E0B', 'noteTextColor': '#92400E', 'sequenceNumberColor': '#ffffff'}}}%%
+sequenceDiagram
+    participant U as User
+    participant A as AI Assistant
+    participant P as Perses
+    participant D as Data
+
+    rect rgb(238, 242, 255)
+        Note over U,D: Step 1: Natural Language Query
+        U->>A: "Why is the API slow?"
+    end
+
+    rect rgb(245, 243, 255)
+        Note over U,D: Step 2: AI Processing
+        A->>A: Parse intent → service, metric, time
+        A->>P: Generate PromQL + Dashboard spec
+    end
+
+    rect rgb(255, 247, 237)
+        Note over U,D: Step 3: Perses Rendering
+        P->>D: Execute queries
+        D-->>P: Metrics + Logs + Traces
+        P-->>A: Dashboard URL + insights
+    end
+
+    rect rgb(240, 253, 244)
+        Note over U,D: Step 4: Conversational Response
+        A-->>U: "P99 latency: 2.3s (up from 200ms)<br/>Root cause: DB connection pool exhausted<br/>[View Dashboard]"
+    end
+```
+
+### Example Queries → Results
+
+| Ask | Get |
+|-----|-----|
+| *"Show errors in checkout"* | Auto-generated error dashboard with logs |
+| *"Compare to last week"* | Time-shifted overlay visualization |
+| *"Why did latency spike at 3pm?"* | Correlated metrics + deployment events |
+| *"Set up an alert for this"* | Perses alerting rule + notification |
+
+### Key Takeaways
+
+- **Reduce MTTR** — Get to root cause faster with natural language
+- **Democratize observability** — Every engineer can query metrics
+- **Perses + AI** — The future of cloud-native dashboarding
+
+---
+
+**Resources:** [perses.dev](https://perses.dev) · [github.com/perses/perses](https://github.com/perses/perses) · CNCF Sandbox Project
